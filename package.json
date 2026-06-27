@@ -1,0 +1,18 @@
+{
+  "name": "zonacero",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ZONA·CERO — battle royale 2D top-down (servidor autoritativo)",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "dev:server": "pnpm --filter @zonacero/game-server dev",
+    "dev:client": "pnpm --filter @zonacero/client dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
