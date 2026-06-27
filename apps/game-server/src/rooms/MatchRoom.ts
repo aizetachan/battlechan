@@ -43,6 +43,13 @@ export class MatchRoom extends Room<MatchState> {
   private inputQueues = new Map<string, InputCommand[]>();
   private botIds: string[] = [];
 
+  /**
+   * Zona de aparición compartida (M1): jugadores y bots aparecen agrupados
+   * para que se vean en pantalla y se aprecie predicción vs interpolación.
+   * En M2 esto se sustituye por la pantalla de salto (drop) de la POC.
+   */
+  private readonly spawn = { x: WORLD.w * 0.5, y: WORLD.h * 0.7 };
+
   onCreate(options: JoinOptions) {
     this.setMetadata({ name: options.name ?? "default" });
     this.setState(new MatchState());
@@ -77,9 +84,9 @@ export class MatchRoom extends Room<MatchState> {
     const p = new Player();
     p.id = client.sessionId;
     p.isBot = false;
-    // Spawn en la mitad inferior del mundo (como la POC por defecto).
-    p.x = this.rng.range(WORLD.w * 0.3, WORLD.w * 0.7);
-    p.y = this.rng.range(WORLD.h * 0.6, WORLD.h * 0.85);
+    // Aparición agrupada (M1) para que los jugadores compartan pantalla.
+    p.x = this.spawn.x + this.rng.range(-220, 220);
+    p.y = this.spawn.y + this.rng.range(-220, 220);
     p.aim = -Math.PI / 2;
     this.state.players.set(client.sessionId, p);
     this.inputQueues.set(client.sessionId, []);
@@ -144,7 +151,8 @@ export class MatchRoom extends Room<MatchState> {
     const b = new Player();
     b.id = id;
     b.isBot = true;
-    this.bots.spawn(b);
+    // M1: bots cerca de la zona de aparición para que sean visibles.
+    this.bots.spawn(b, { x: this.spawn.x, y: this.spawn.y, radius: 320 });
     this.state.players.set(id, b);
     this.botIds.push(id);
   }

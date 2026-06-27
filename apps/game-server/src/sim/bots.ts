@@ -26,9 +26,18 @@ export class BotController {
 
   constructor(private rng: SeededRng) {}
 
-  spawn(player: Player): void {
-    player.x = this.rng.range(150, WORLD.w - 150);
-    player.y = this.rng.range(150, WORLD.h - 150);
+  /**
+   * @param center Si se indica, el bot aparece cerca de ese punto (M1: para
+   *   que jugadores y bots compartan pantalla y se vea la interpolación).
+   */
+  spawn(player: Player, center?: { x: number; y: number; radius: number }): void {
+    if (center) {
+      player.x = center.x + this.rng.range(-center.radius, center.radius);
+      player.y = center.y + this.rng.range(-center.radius, center.radius);
+    } else {
+      player.x = this.rng.range(150, WORLD.w - 150);
+      player.y = this.rng.range(150, WORLD.h - 150);
+    }
     player.aim = this.rng.range(0, Math.PI * 2);
     this.wander.set(player.id, {
       roamA: this.rng.range(0, Math.PI * 2),
