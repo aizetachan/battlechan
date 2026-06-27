@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>BR Top-Down POC</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#070a10;font-family:system-ui,-apple-system,sans-serif;color:#e8eef5;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  #stage{position:relative;width:100%;height:100%;max-width:calc(100vh*0.5625);background:#0c111a;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;touch-action:none;}
+
+  /* ---------- META SCREENS ---------- */
+  .screen{position:absolute;inset:0;z-index:10;display:none;flex-direction:column;background:linear-gradient(160deg,#0c1118,#0a0f17 60%,#10141d);}
+  .screen.show{display:flex;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);}
+  .coins{display:flex;align-items:center;gap:6px;font-weight:700;font-size:15px;color:#ffd866;}
+  .coins::before{content:'●';color:#ffd866;}
+  .lvl{font-size:12px;opacity:.7;}
+  .scrollarea{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;}
+  h1.logo{font-size:34px;font-weight:800;letter-spacing:-1px;text-align:center;margin:auto 0 6px;}
+  h1.logo span{color:#7ee787;}
+  .tagline{text-align:center;opacity:.6;font-size:13px;margin-bottom:30px;}
+  .scrtitle{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;opacity:.55;margin:4px 2px 14px;}
+
+  .btn{display:block;width:100%;padding:16px;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;}
+  .btn-primary{background:#7ee787;color:#06140a;}
+  .btn-ghost{background:rgba(255,255,255,.06);color:#e8eef5;border:1px solid rgba(255,255,255,.1);font-weight:700;font-size:15px;}
+  .home-actions{display:flex;flex-direction:column;gap:12px;margin-top:auto;padding-bottom:8px;}
+  .home-row{display:flex;gap:12px;}
+  .home-row .btn{flex:1;}
+
+  .navback{background:none;border:none;color:#7ee787;font-size:15px;font-weight:700;cursor:pointer;padding:4px 0;}
+
+  /* cards */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;position:relative;}
+  .card.equipped{border-color:#7ee787;box-shadow:0 0 0 1px #7ee787 inset;}
+  .card .swatch{height:64px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .card .nm{font-weight:700;font-size:14px;}
+  .card .meta{font-size:11px;opacity:.65;line-height:1.4;}
+  .card .price{font-size:13px;font-weight:800;color:#ffd866;}
+  .card .act{margin-top:4px;padding:9px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;}
+  .act-buy{background:#ffd866;color:#1a1405;}
+  .act-equip{background:rgba(126,231,135,.16);color:#7ee787;border:1px solid rgba(126,231,135,.4)!important;}
+  .act-on{background:#7ee787;color:#06140a;}
+  .act-locked{background:rgba(255,255,255,.06);color:#7a8290;}
+  .tag{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;padding:3px 7px;border-radius:20px;background:#7ee787;color:#06140a;}
+  .statbars{display:flex;flex-direction:column;gap:4px;margin-top:2px;}
+  .statbars .s{display:flex;align-items:center;gap:6px;font-size:10px;opacity:.8;}
+  .statbars .bar{flex:1;height:4px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;}
+  .statbars .bar i{display:block;height:100%;background:#7ee787;}
+
+  .toast{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);background:rgba(8,14,20,.95);border:1px solid rgba(126,231,135,.4);
+         padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:30;opacity:0;transition:opacity .25s, transform .25s;pointer-events:none;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+  /* tabs in inventory/shop */
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:13px;font-weight:700;background:rgba(255,255,255,.05);cursor:pointer;}
+  .tab.on{background:#7ee787;color:#06140a;}
+
+  /* ---------- DROP SCREEN ---------- */
+  #dropScreen{position:absolute;inset:0;z-index:11;display:none;flex-direction:column;background:rgba(6,10,16,.92);}
+  #dropScreen.show{display:flex;}
+  #dropScreen .scrtitle{padding:16px 16px 0;}
+  #dropMapWrap{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;}
+  #dropMap{background:#11161f;border:1.5px solid rgba(126,231,135,.4);border-radius:8px;touch-action:none;}
+  #dropFoot{padding:16px;}
+  #dropHint{text-align:center;opacity:.7;font-size:13px;margin-bottom:12px;}
+
+  /* ---------- IN-GAME HUD ---------- */
+  #hud{position:absolute;top:0;left:0;width:100%;pointer-events:none;padding:12px 14px;z-index:5;display:none;}
+  #hud.show{display:block;}
+  #hud .row{display:flex;justify-content:space-between;align-items:center;}
+  #alive{font-weight:700;font-size:15px;}#alive b{color:#7ee787;}
+  #hpbar{margin-top:8px;width:150px;height:13px;background:rgba(255,255,255,.12);border-radius:7px;overflow:hidden;}
+  #hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5b5b,#ff9d5b);}
+  #wpnTag{margin-top:6px;font-size:11px;opacity:.8;}#zoneInfo{font-size:11px;opacity:.75;margin-top:3px;}
+
+  #joy{position:absolute;left:18px;bottom:28px;width:132px;height:132px;border-radius:50%;background:rgba(255,255,255,.05);
+       border:1px solid rgba(255,255,255,.12);z-index:6;touch-action:none;display:none;}
+  #joy.show{display:block;}
+  #knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;
+        background:rgba(126,231,135,.28);border:1px solid rgba(126,231,135,.65);}
+  #fire{position:absolute;right:22px;bottom:36px;width:98px;height:98px;border-radius:50%;background:rgba(255,91,91,.18);
+        border:2px solid rgba(255,91,91,.7);z-index:7;touch-action:none;display:none;align-items:center;justify-content:center;
+        color:#ff9d9d;font-weight:700;font-size:15px;}
+  #fire.show{display:flex;}#fire.act{background:rgba(255,91,91,.45);}
+
+  #useBtn{position:absolute;right:130px;bottom:44px;width:64px;height:64px;border-radius:50%;
+          background:rgba(126,231,135,.16);border:2px solid rgba(126,231,135,.6);z-index:7;touch-action:none;
+          display:none;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#7ee787;}
+  #useBtn.show{display:flex;}#useBtn:active{background:rgba(126,231,135,.4);}
+
+  #swapBtn{position:absolute;left:18px;bottom:170px;min-width:96px;height:46px;padding:0 12px;border-radius:12px;
+           background:rgba(159,179,200,.18);border:2px solid rgba(159,179,200,.6);z-index:7;touch-action:none;
+           display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;color:#cdd6e0;}
+  #swapBtn.show{display:flex;}#swapBtn:active{background:rgba(159,179,200,.4);}
+
+  #ammoBox{position:absolute;right:22px;bottom:140px;width:98px;z-index:7;display:none;flex-direction:column;align-items:center;gap:5px;pointer-events:none;}
+  #ammoBox.show{display:flex;}
+  #ammoText{font-size:18px;font-weight:800;color:#e8eef5;text-shadow:0 1px 3px rgba(0,0,0,.7);}
+  #ammoText.empty{color:#ff7b7b;}
+  #reloadBar{width:80px;height:5px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;opacity:0;transition:opacity .15s;}
+  #reloadBar.show{opacity:1;}
+  #reloadFill{height:100%;width:0%;background:linear-gradient(90deg,#ffd866,#7ee787);}
+
+  #spectate{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);z-index:8;display:none;align-items:center;gap:18px;}
+  #spectate.show{display:flex;}
+  #specActions{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:8;display:none;flex-direction:column;gap:10px;width:84%;max-width:300px;}
+  #specActions.show{display:flex;}
+  .specArrow{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;
+             color:#e8eef5;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.25);touch-action:none;}
+  .specArrow:active{background:rgba(126,231,135,.3);}
+  #specLabel{min-width:120px;text-align:center;color:#cdd6e0;font-size:13px;font-weight:600;background:rgba(8,12,18,.6);padding:8px 12px;border-radius:10px;}
+
+  /* end overlay */
+  #endOv{position:absolute;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;
+         background:rgba(6,9,14,.9);text-align:center;padding:24px;}
+  #endOv.show{display:flex;}
+  #placeMsg{font-size:26px;font-weight:800;color:#ff9d5b;margin-bottom:6px;}
+  #endTitle{font-size:30px;margin-bottom:8px;}
+  #endSub{opacity:.85;font-size:14px;margin-bottom:10px;line-height:1.5;}
+  #reward{font-size:16px;font-weight:800;color:#ffd866;margin-bottom:22px;}
+  #endBtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px;}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="cv"></canvas>
+
+  <!-- HOME -->
+  <div class="screen show" id="homeScreen">
+    <div class="topbar"><div class="coins" id="coinsHome">0</div><div class="lvl" id="lvlHome">Nivel 1</div></div>
+    <div class="scrollarea" style="display:flex;flex-direction:column;">
+      <h1 class="logo">ZONA<span>·CERO</span></h1>
+      <div class="tagline">Battle Royale · 10 jugadores · último en pie gana</div>
+      <div class="home-actions">
+        <button class="btn btn-primary" id="goPlay">JUGAR</button>
+        <div class="home-row">
+          <button class="btn btn-ghost" id="goChar">Personaje</button>
+          <button class="btn btn-ghost" id="goShop">Tienda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARACTER (skins + owned weapons) -->
+  <div class="screen" id="charScreen">
+    <div class="topbar"><button class="navback" data-home>‹ Volver</button><div class="coins" id="coinsChar">0</div></div>
+    <div class="scrollarea">
+      <div class="tabs"><div class="tab on" data-chartab="skins">Skins</div><div class="tab" data-chartab="weapons">Armas</div><div class="tab" data-chartab="items">Items</div></div>
+      <div id="charSkinsPane">
+        <div id="charPreview" style="height:120px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;"></div>
+        <div class="grid" id="skinGrid"></div>
+      </div>
+      <div id="charWpnsPane" style="display:none;">
+        <div class="scrtitle">Tu arsenal · equipa una</div>
+        <div class="grid" id="invGrid"></div>
+      </div>
+      <div id="charItemsPane" style="display:none;">
+        <div class="scrtitle">Pasivo equipado (1)</div>
+        <div class="grid" id="passiveGrid"></div>
+        <div class="scrtitle" style="margin-top:18px;">Consumible a llevar</div>
+        <div class="grid" id="consumGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen" id="shopScreen">
+    <div class="topbar"><button class="navback" data-home>‹ Volver</button><div class="coins" id="coinsShop">0</div></div>
+    <div class="scrollarea">
+      <div class="tabs"><div class="tab on" data-shoptab="weapons">Armas</div><div class="tab" data-shoptab="skins">Skins</div><div class="tab" data-shoptab="items">Items</div></div>
+      <div class="grid" id="shopGrid"></div>
+    </div>
+  </div>
+
+  <!-- DROP -->
+  <div id="dropScreen">
+    <div class="topbar"><button class="navback" id="dropBack">‹ Volver</button><div class="coins" id="coinsDrop">0</div></div>
+    <div class="scrtitle" style="padding:0 16px;">Elige dónde aterrizar</div>
+    <div id="dropMapWrap"><canvas id="dropMap"></canvas></div>
+    <div id="dropFoot">
+      <div id="dropHint">Toca un punto del mapa para marcar tu zona de caída</div>
+      <button class="btn btn-primary" id="dropGo" disabled style="opacity:.5;">SALTAR</button>
+    </div>
+  </div>
+
+  <!-- HUD + controls -->
+  <div id="hud">
+    <div class="row"><div id="alive">Vivos: <b>10</b>/10</div><div style="display:flex;gap:12px;"><div id="matchCoins" style="color:#ffd866;font-weight:700;display:none;">● 0</div><div id="kills">Bajas: 0</div></div></div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+    <div id="wpnTag">Pistola</div>
+    <div id="shieldTag" style="display:none;margin-top:4px;font-size:12px;font-weight:700;color:#5bd6ff;"></div>
+    <div id="zoneInfo">Zona cerrando…</div>
+  </div>
+  <div id="joy"><div id="knob"></div></div>
+  <div id="fire">FUEGO</div>
+  <div id="ammoBox">
+    <div id="ammoText">12 / 12</div>
+    <div id="reloadBar"><div id="reloadFill"></div></div>
+  </div>
+  <div id="useBtn"></div>
+  <div id="swapBtn"></div>
+  <div id="spectate"><div id="specArrowL" class="specArrow">‹</div><div id="specLabel">Observando</div><div id="specArrowR" class="specArrow">›</div></div>
+  <div id="specActions">
+    <button class="btn btn-primary" id="specAgain">Jugar de nuevo</button>
+    <button class="btn btn-ghost" id="specMenu">Menú</button>
+  </div>
+
+  <!-- END -->
+  <div id="endOv">
+    <div id="placeMsg"></div><div id="endTitle"></div><div id="endSub"></div><div id="reward"></div>
+    <div id="endBtns">
+      <button class="btn btn-primary" id="endAgain">JUGAR DE NUEVO</button>
+      <button class="btn btn-ghost" id="endHome">Menú principal</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+(()=>{
+  // ============ DATA ============
+
+  // 4 stats per weapon, all differentiated:
+  //  dmg    = daño por impacto
+  //  range  = alcance (frames que recorre la bala antes de desvanecerse)
+  //  cd     = cadencia (frames entre disparos; menor = dispara más rápido)
+  //  reload = recarga (frames que tarda en recargar el cargador)
+  const WEAPONS = {
+    pistol:  {name:'Pistola',    price:0,   dmg:32, range:70,  cd:14, reload:50,  mag:12, spd:9.5, spread:0.05, pellets:1, color:'#9fb3c8', desc:'Equilibrada en todo. La de inicio.'},
+    smg:     {name:'Ráfaga SMG', price:300, dmg:15, range:48,  cd:5,  reload:60,  mag:30, spd:10,  spread:0.14, pellets:1, color:'#7ee787', desc:'Cadencia altísima y recarga rápida. Poco daño y alcance.'},
+    shotgun: {name:'Escopeta',   price:550, dmg:18, range:26,  cd:30, reload:95,  mag:6,  spd:8.5, spread:0.32, pellets:5, color:'#ff9d5b', desc:'Brutal de cerca, alcance corto. Lenta.'},
+    sniper:  {name:'Sniper',     price:800, dmg:95, range:130, cd:55, reload:130, mag:4,  spd:16,  spread:0.0,  pellets:1, color:'#ff6b8a', desc:'Daño y alcance máximos. Cadencia y recarga muy lentas.'}
+  };
+  const SKINS = {
+    green:  {name:'Recluta',  price:0,   color:'#7ee787', shape:'circle'},
+    cyan:   {name:'Glaciar',  price:150, color:'#5bd6ff', shape:'circle'},
+    purple: {name:'Vórtice',  price:150, color:'#b07eff', shape:'square'},
+    gold:   {name:'Élite',    price:400, color:'#ffd866', shape:'triangle'},
+    red:    {name:'Carmesí',  price:400, color:'#ff5b5b', shape:'square'}
+  };
+  // type: 'consumable' (carried into match, used with USAR button or auto on pickup)
+  //       'passive' (equip 1, applies stat mod for whole match)
+  const ITEMS = {
+    medkit:    {name:'Botiquín',     type:'consumable', price:120, color:'#7ee787', icon:'✚', desc:'Restaura 60 de vida.', heal:60},
+    shield:    {name:'Escudo',       type:'consumable', price:180, color:'#5bd6ff', icon:'🛡', desc:'+50 de escudo temporal.', shield:50},
+    adrenalin: {name:'Adrenalina',   type:'consumable', price:150, color:'#ff9d5b', icon:'⚡', desc:'+60% velocidad 6s.', boost:1.6, boostT:360},
+    vest:      {name:'Chaleco',      type:'passive', price:350, color:'#b07eff', icon:'🦺', desc:'+40 vida máxima.', maxhp:40},
+    boots:     {name:'Botas ligeras',type:'passive', price:300, color:'#ffd866', icon:'👟', desc:'+18% velocidad base.', spd:1.18},
+    magazine:  {name:'Cargador rápido',type:'passive', price:400, color:'#ff6b8a', icon:'🔩', desc:'-25% tiempo de recarga.', cd:0.75}
+  };
+
+  // ============ PROFILE (in-memory persistence for session) ============
+  const profile = {
+    coins: 250, level: 1, xp: 0,
+    ownedW: {pistol:true}, ownedS: {green:true},
+    ownedI: {}, // itemId -> count (consumables) or true (passives)
+    equipW: 'pistol', equipS: 'green',
+    equipPassive: null,      // one passive item id
+    equipConsumable: null    // one consumable id to carry (uses its owned count)
+  };
+
+  // ============ DOM ============
+  const $=id=>document.getElementById(id);
+  const cv=$('cv'), ctx=cv.getContext('2d'), stage=$('stage');
+  const joyEl=$('joy'), knob=$('knob'), fireEl=$('fire'), specEl=$('spectate'), specLabel=$('specLabel');
+  const hud=$('hud');
+
+  function refreshCoins(){
+    ['coinsHome','coinsChar','coinsShop'].forEach(i=>{ const e=$(i); if(e)e.textContent=profile.coins; });
+    $('lvlHome').textContent='Nivel '+profile.level;
+  }
+  let toastT;
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1600); }
+
+  function show(screenId){
+    ['homeScreen','charScreen','shopScreen'].forEach(s=>$(s).classList.remove('show'));
+    if(screenId) $(screenId).classList.add('show');
+    refreshCoins();
+  }
+  document.querySelectorAll('[data-home]').forEach(b=>b.addEventListener('click',()=>show('homeScreen')));
+
+  // ============ META RENDERERS ============
+  function swatchStyle(color){ return `background:radial-gradient(circle at 40% 35%, ${color}, ${color}99);`; }
+
+  function renderSkins(){
+    const grid=$('skinGrid'); grid.innerHTML='';
+    const pv=$('charPreview'); const s=SKINS[profile.equipS];
+    pv.innerHTML=`<div style="width:84px;height:84px;border-radius:${s.shape==='circle'?'50%':s.shape==='square'?'14px':'8px'};${swatchStyle(s.color)};box-shadow:0 8px 30px ${s.color}55;"></div>`;
+    const owned=Object.entries(SKINS).filter(([id])=>profile.ownedS[id]);
+    for(const [id,sk] of owned){
+      const on=profile.equipS===id;
+      const card=document.createElement('div'); card.className='card'+(on?' equipped':'');
+      card.innerHTML=`${on?'<div class="tag">EQUIPADA</div>':''}
+        <div class="swatch" style="${swatchStyle(sk.color)}"></div>
+        <div class="nm">${sk.name}</div>
+        <div class="meta">En propiedad</div>
+        <button class="act ${on?'act-on':'act-equip'}">${on?'Equipada':'Equipar'}</button>`;
+      card.querySelector('.act').addEventListener('click',()=>{ if(on)return; profile.equipS=id; renderSkins(); toast('Skin equipada'); });
+      grid.appendChild(card);
+    }
+    // gentle hint to visit shop for more
+    const hint=document.createElement('div');
+    hint.style.cssText='grid-column:1/-1;text-align:center;opacity:.5;font-size:12px;margin-top:6px;';
+    hint.textContent='Consigue más skins en la Tienda';
+    grid.appendChild(hint);
+  }
+
+  function weaponStatCard(id,w,owned,on,inShop){
+    // normalize each stat 0..1 against the spread across all weapons (lower cd/reload = better)
+    const norm={
+      dmg: Math.min(w.dmg/95,1),
+      rng: Math.min(w.range/130,1),
+      cad: Math.min((60-w.cd)/57,1),     // faster cadence -> fuller bar
+      rec: Math.min((140-w.reload)/95,1) // faster reload  -> fuller bar
+    };
+    const bars=`<div class="statbars">
+      <div class="s">DAÑO<div class="bar"><i style="width:${Math.max(6,norm.dmg*100)}%"></i></div></div>
+      <div class="s">ALCAN<div class="bar"><i style="width:${Math.max(6,norm.rng*100)}%"></i></div></div>
+      <div class="s">CADEN<div class="bar"><i style="width:${Math.max(6,norm.cad*100)}%"></i></div></div>
+      <div class="s">RECAR<div class="bar"><i style="width:${Math.max(6,norm.rec*100)}%"></i></div></div></div>`;
+    let action;
+    if(inShop){
+      if(owned) action=`<button class="act act-locked">En propiedad</button>`;
+      else action=`<button class="act act-buy">${w.price} ●</button>`;
+    } else {
+      action=`<button class="act ${on?'act-on':'act-equip'}">${on?'Equipada':'Equipar'}</button>`;
+    }
+    return `${on&&!inShop?'<div class="tag">EQUIPADA</div>':''}
+      <div class="swatch" style="${swatchStyle(w.color)}">🔫</div>
+      <div class="nm">${w.name}</div>
+      <div class="meta">${w.desc}</div>${bars}${action}`;
+  }
+
+  function renderInventory(){
+    const grid=$('invGrid'); grid.innerHTML='';
+    for(const [id,w] of Object.entries(WEAPONS)){
+      if(!profile.ownedW[id]) continue;
+      const on=profile.equipW===id;
+      const card=document.createElement('div'); card.className='card'+(on?' equipped':'');
+      card.innerHTML=weaponStatCard(id,w,true,on,false);
+      card.querySelector('.act').addEventListener('click',()=>{ if(on)return; profile.equipW=id; renderInventory(); toast(w.name+' equipada'); });
+      grid.appendChild(card);
+    }
+  }
+
+  let shopTab='weapons';
+  function renderShop(){
+    document.querySelectorAll('[data-shoptab]').forEach(t=>t.classList.toggle('on',t.dataset.shoptab===shopTab));
+    const grid=$('shopGrid'); grid.innerHTML='';
+    if(shopTab==='weapons'){
+      for(const [id,w] of Object.entries(WEAPONS)){
+        const owned=profile.ownedW[id];
+        const card=document.createElement('div'); card.className='card';
+        card.innerHTML=weaponStatCard(id,w,owned,false,true);
+        if(!owned) card.querySelector('.act').addEventListener('click',()=>{
+          if(profile.coins>=w.price){ profile.coins-=w.price; profile.ownedW[id]=true; profile.equipW=id; toast('¡Comprada y equipada!'); renderShop(); }
+          else toast('Monedas insuficientes');
+        });
+        grid.appendChild(card);
+      }
+    } else if(shopTab==='skins'){
+      for(const [id,sk] of Object.entries(SKINS)){
+        const owned=profile.ownedS[id];
+        const card=document.createElement('div'); card.className='card';
+        card.innerHTML=`<div class="swatch" style="${swatchStyle(sk.color)}"></div><div class="nm">${sk.name}</div>
+          <div class="meta">Skin de personaje</div>
+          <button class="act ${owned?'act-locked':'act-buy'}">${owned?'En propiedad':sk.price+' ●'}</button>`;
+        if(!owned) card.querySelector('.act').addEventListener('click',()=>{
+          if(profile.coins>=sk.price){ profile.coins-=sk.price; profile.ownedS[id]=true; toast('¡Skin comprada!'); renderShop(); }
+          else toast('Monedas insuficientes');
+        });
+        grid.appendChild(card);
+      }
+    } else { // items
+      for(const [id,it] of Object.entries(ITEMS)){
+        const isPassive=it.type==='passive';
+        const ownedP=isPassive && profile.ownedI[id];
+        const count=profile.ownedI[id]||0;
+        const card=document.createElement('div'); card.className='card';
+        let actHtml;
+        if(isPassive) actHtml=`<button class="act ${ownedP?'act-locked':'act-buy'}">${ownedP?'En propiedad':it.price+' ●'}</button>`;
+        else actHtml=`<button class="act act-buy">${it.price} ●</button>`;
+        card.innerHTML=`<div class="swatch" style="${swatchStyle(it.color)}"><span style="font-size:26px">${it.icon}</span></div>
+          <div class="nm">${it.name}</div>
+          <div class="meta">${it.type==='passive'?'Pasivo · ':'Consumible · '}${it.desc}${!isPassive&&count?` (tienes ${count})`:''}</div>
+          ${actHtml}`;
+        const btn=card.querySelector('.act');
+        if(!(isPassive&&ownedP)) btn.addEventListener('click',()=>{
+          if(profile.coins<it.price){ toast('Monedas insuficientes'); return; }
+          profile.coins-=it.price;
+          if(isPassive){ profile.ownedI[id]=true; profile.equipPassive=id; toast('¡Pasivo comprado y equipado!'); }
+          else { profile.ownedI[id]=(profile.ownedI[id]||0)+1; if(!profile.equipConsumable) profile.equipConsumable=id; toast('¡Item comprado!'); }
+          renderShop();
+        });
+        grid.appendChild(card);
+      }
+    }
+  }
+  document.querySelectorAll('[data-shoptab]').forEach(t=>t.addEventListener('click',()=>{shopTab=t.dataset.shoptab;renderShop();}));
+
+  // nav
+  // nav
+  let charTab='skins';
+  function openChar(){ show('charScreen'); setCharTab(charTab); }
+  function setCharTab(tab){
+    charTab=tab;
+    document.querySelectorAll('[data-chartab]').forEach(t=>t.classList.toggle('on',t.dataset.chartab===tab));
+    $('charSkinsPane').style.display = tab==='skins'?'':'none';
+    $('charWpnsPane').style.display = tab==='weapons'?'':'none';
+    $('charItemsPane').style.display = tab==='items'?'':'none';
+    if(tab==='skins') renderSkins(); else if(tab==='weapons') renderInventory(); else renderItems();
+  }
+
+  function renderItems(){
+    const pg=$('passiveGrid'); pg.innerHTML='';
+    const ownedPassives=Object.entries(ITEMS).filter(([id,it])=>it.type==='passive'&&profile.ownedI[id]);
+    if(!ownedPassives.length){ pg.innerHTML=`<div style="grid-column:1/-1;opacity:.5;font-size:12px;text-align:center;">Sin pasivos. Cómpralos en la Tienda.</div>`; }
+    // option to unequip
+    ownedPassives.forEach(([id,it])=>{
+      const on=profile.equipPassive===id;
+      const card=document.createElement('div'); card.className='card'+(on?' equipped':'');
+      card.innerHTML=`${on?'<div class="tag">ACTIVO</div>':''}
+        <div class="swatch" style="${swatchStyle(it.color)}"><span style="font-size:24px">${it.icon}</span></div>
+        <div class="nm">${it.name}</div><div class="meta">${it.desc}</div>
+        <button class="act ${on?'act-on':'act-equip'}">${on?'Quitar':'Equipar'}</button>`;
+      card.querySelector('.act').addEventListener('click',()=>{ profile.equipPassive=on?null:id; renderItems(); toast(on?'Pasivo retirado':'Pasivo equipado'); });
+      pg.appendChild(card);
+    });
+
+    const cg=$('consumGrid'); cg.innerHTML='';
+    const ownedCons=Object.entries(ITEMS).filter(([id,it])=>it.type==='consumable'&&(profile.ownedI[id]||0)>0);
+    if(!ownedCons.length){ cg.innerHTML=`<div style="grid-column:1/-1;opacity:.5;font-size:12px;text-align:center;">Sin consumibles. Cómpralos en la Tienda o recógelos en partida.</div>`; }
+    ownedCons.forEach(([id,it])=>{
+      const on=profile.equipConsumable===id; const count=profile.ownedI[id]||0;
+      const card=document.createElement('div'); card.className='card'+(on?' equipped':'');
+      card.innerHTML=`${on?'<div class="tag">LLEVAS</div>':''}
+        <div class="swatch" style="${swatchStyle(it.color)}"><span style="font-size:24px">${it.icon}</span></div>
+        <div class="nm">${it.name} ×${count}</div><div class="meta">${it.desc}</div>
+        <button class="act ${on?'act-on':'act-equip'}">${on?'Seleccionado':'Llevar'}</button>`;
+      card.querySelector('.act').addEventListener('click',()=>{ profile.equipConsumable=on?null:id; renderItems(); toast(on?'Quitado':'Lo llevarás a la partida'); });
+      cg.appendChild(card);
+    });
+  }
+  document.querySelectorAll('[data-chartab]').forEach(t=>t.addEventListener('click',()=>setCharTab(t.dataset.chartab)));
+  $('goChar').addEventListener('click',openChar);
+  $('goShop').addEventListener('click',()=>{show('shopScreen');renderShop();});
+  $('goPlay').addEventListener('click',()=>openDrop());
+
+  // ============ WORLD / GAME ============
+  const WORLD={w:4200,h:6300};
+  let VIEW={w:360,h:640};
+  let DPR=Math.min(window.devicePixelRatio||1,2);
+  function resize(){
+    const r=stage.getBoundingClientRect();
+    VIEW.w=Math.max(1,r.width); VIEW.h=Math.max(1,r.height);
+    cv.width=Math.round(VIEW.w*DPR); cv.height=Math.round(VIEW.h*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize',resize);
+  window.addEventListener('orientationchange',()=>setTimeout(resize,200));
+
+  const PLAYER_R=16,BOT_R=16,BULLET_R=5;
+  let player,bots,bullets,pickups,zone,cam,state,kills,frame,deadRank,specIndex=0;
+  let crates=[],supply=null,supplyTimer=0,hotzone=null,coinFx=0,matchCoins=0;
+  let dropPoint=null;
+
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const d2=(ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;};
+
+  function mkEnt(isPlayer){
+    const wpnId=isPlayer?profile.equipW:botWeapon();
+    return {x:rand(120,WORLD.w-120),y:rand(120,WORLD.h-120),r:isPlayer?PLAYER_R:BOT_R,
+      hp:100,maxhp:100,shield:0,boostT:0,boostMul:1,cdMul:1,spdMul:1,alive:true,isPlayer,
+      aim:rand(0,Math.PI*2),cd:0,wanderT:0,wx:0,wy:0,mvx:0,mvy:0,
+      hue:isPlayer?140:Math.floor(rand(0,360)),
+      wpn:wpnId, ammo:WEAPONS[wpnId].mag, reloadT:0,
+      zoneState:'safe', distractT:0, target:null, roamA:undefined, wanderT:undefined,
+      skin:isPlayer?profile.equipS:null};
+  }
+  function botWeapon(){ const ids=Object.keys(WEAPONS); return ids[Math.floor(rand(0,ids.length))]; }
+
+  // up to 3 consumable charges (each entry an item id), and up to 2 weapons
+  const MAX_ITEMS=3, MAX_WEAPONS=2;
+  let bag=[];        // e.g. ['medkit','shield','medkit']
+  let weaponsHeld=[];// e.g. ['pistol','sniper']; weaponsHeld[0] is active
+
+  function applyPassive(p){
+    const it=profile.equipPassive?ITEMS[profile.equipPassive]:null;
+    if(!it){ p.maxhp=100; p.hp=100; return; }
+    if(it.maxhp){ p.maxhp=100+it.maxhp; p.hp=p.maxhp; }
+    if(it.spd){ p.spdMul=it.spd; }
+    if(it.cd){ p.cdMul=it.cd; }
+  }
+
+  function init(){
+    player=mkEnt(true);
+    applyPassive(player);
+    if(dropPoint){ player.x=dropPoint.x; player.y=dropPoint.y; }
+    else { player.x=WORLD.w*0.5; player.y=WORLD.h*0.8; }
+    bots=[];
+    // distribute bots across a jittered 3x4 grid so nobody starts on top of each other
+    const cols=3, rowsN=5, cellW=WORLD.w/cols, cellH=WORLD.h/rowsN;
+    const cells=[];
+    for(let r=0;r<rowsN;r++) for(let c=0;c<cols;c++) cells.push({c,r});
+    for(let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
+    const minSep=750; let ci=0;
+    for(let i=0;i<9;i++){
+      const b=mkEnt(false);
+      let placed=false, tries=0;
+      while(!placed && tries<cells.length){
+        const cell=cells[(ci++)%cells.length]; tries++;
+        const bx=cell.c*cellW+rand(cellW*0.2,cellW*0.8);
+        const by=cell.r*cellH+rand(cellH*0.2,cellH*0.8);
+        if(d2(bx,by,player.x,player.y) > minSep*minSep){ b.x=bx; b.y=by; placed=true; }
+      }
+      if(!placed){ b.x=rand(150,WORLD.w-150); b.y=rand(150,WORLD.h-150); }
+      bots.push(b);
+    }
+    bullets=[]; pickups=[];
+    // ---- loot crates scattered on the map (open by standing on them ~1s) ----
+    crates=[];
+    for(let i=0;i<26;i++){
+      crates.push({x:rand(180,WORLD.w-180),y:rand(180,WORLD.h-180),
+        opening:0, opened:false, premium:false, reward:rollCrateReward(false)});
+    }
+    // ---- supply drop (premium) state ----
+    supply=null; supplyTimer=300; // first drop ~5s in
+    // ---- hot zone (rotating) ----
+    hotzone={x:rand(WORLD.w*0.2,WORLD.w*0.8),y:rand(WORLD.h*0.2,WORLD.h*0.8),r:300,life:900}; // ~15s then rotates
+    coinFx=0;
+    zone={cx:rand(WORLD.w*0.3,WORLD.w*0.7),cy:rand(WORLD.h*0.3,WORLD.h*0.7),
+          r:Math.hypot(WORLD.w,WORLD.h)*0.85,minR:200,shrink:0.42,dmg:0.3,
+          delay:360};  // ~6s before it starts closing
+    cam={x:player.x-VIEW.w/2,y:player.y-VIEW.h/2}; clampCam();
+    kills=0;frame=0;deadRank=0;state='play';matchCoins=0;
+    // weapon inventory: start with your equipped weapon as the active one
+    weaponsHeld=[player.wpn];
+    // bag: prefill from equipped consumable loadout, up to MAX_ITEMS
+    bag=[];
+    if(profile.equipConsumable){
+      const owned=profile.ownedI[profile.equipConsumable]||0;
+      for(let i=0;i<Math.min(owned,MAX_ITEMS);i++) bag.push(profile.equipConsumable);
+    }
+    joyEl.classList.add('show'); fireEl.classList.add('show'); hud.classList.add('show'); $('ammoBox').classList.add('show');
+    specEl.classList.remove('show'); $('specActions').classList.remove('show'); $('endOv').classList.remove('show');
+    $('wpnTag').textContent=WEAPONS[player.wpn].name;
+    updateUseBtn();
+    updateSwapBtn();
+    updateHUD();
+  }
+  function clampCam(){
+    cam.x=Math.max(0,Math.min(Math.max(0,WORLD.w-VIEW.w),cam.x));
+    cam.y=Math.max(0,Math.min(Math.max(0,WORLD.h-VIEW.h),cam.y));
+  }
+
+  // ---------- DROP SCREEN ----------
+  const dropCv=$('dropMap'), dctx=dropCv.getContext('2d');
+  function openDrop(){
+    show(null); $('dropScreen').classList.add('show');
+    const cd=$('coinsDrop'); if(cd) cd.textContent=profile.coins;
+    dropPoint=null; $('dropGo').disabled=true; $('dropGo').style.opacity=.5;
+    // size drop map to portrait aspect
+    const maxW=Math.min(VIEW.w-32,260), mh=maxW*(WORLD.h/WORLD.w);
+    dropCv.style.width=maxW+'px'; dropCv.style.height=mh+'px';
+    dropCv.width=maxW*DPR; dropCv.height=mh*DPR; dctx.setTransform(DPR,0,0,DPR,0,0);
+    drawDrop(maxW,mh);
+  }
+  function drawDrop(w,h){
+    dctx.clearRect(0,0,w,h);
+    dctx.fillStyle='#11161f'; dctx.fillRect(0,0,w,h);
+    dctx.strokeStyle='rgba(255,255,255,.06)'; dctx.lineWidth=1;
+    for(let i=1;i<5;i++){ dctx.beginPath();dctx.moveTo(w*i/5,0);dctx.lineTo(w*i/5,h);dctx.stroke();
+      dctx.beginPath();dctx.moveTo(0,h*i/7);dctx.lineTo(w,h*i/7);dctx.stroke(); }
+    dctx.strokeStyle='rgba(126,231,135,.4)'; dctx.lineWidth=2; dctx.strokeRect(1,1,w-2,h-2);
+    if(dropPoint){
+      const px=dropPoint.x/WORLD.w*w, py=dropPoint.y/WORLD.h*h;
+      dctx.beginPath();dctx.arc(px,py,7,0,Math.PI*2);dctx.fillStyle='#7ee787';dctx.fill();
+      dctx.beginPath();dctx.arc(px,py,13,0,Math.PI*2);dctx.strokeStyle='#7ee787';dctx.lineWidth=2;dctx.stroke();
+    }
+  }
+  dropCv.addEventListener('pointerdown',e=>{
+    const r=dropCv.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width*WORLD.w, y=(e.clientY-r.top)/r.height*WORLD.h;
+    dropPoint={x:Math.max(80,Math.min(WORLD.w-80,x)),y:Math.max(80,Math.min(WORLD.h-80,y))};
+    $('dropGo').disabled=false; $('dropGo').style.opacity=1;
+    drawDrop(parseFloat(dropCv.style.width),parseFloat(dropCv.style.height));
+  });
+  $('dropGo').addEventListener('click',()=>{ $('dropScreen').classList.remove('show'); resize(); init(); });
+  $('dropBack').addEventListener('click',()=>{ $('dropScreen').classList.remove('show'); state='menu'; show('homeScreen'); });
+
+  // ---------- INPUT ----------
+  const joy={active:false,pid:null,baseX:0,baseY:0,dx:0,dy:0,mag:0};
+  let firing=false,firePid=null;
+  function joyDown(e){ joy.active=true;joy.pid=e.pointerId;const r=joyEl.getBoundingClientRect();
+    joy.baseX=r.left+r.width/2;joy.baseY=r.top+r.height/2;joyMove(e);try{joyEl.setPointerCapture(e.pointerId);}catch(_){}}
+  function joyMove(e){ if(!joy.active||e.pointerId!==joy.pid)return;
+    let dx=e.clientX-joy.baseX,dy=e.clientY-joy.baseY;const max=52,m=Math.hypot(dx,dy);
+    if(m>max){dx=dx/m*max;dy=dy/m*max;} joy.dx=dx/max;joy.dy=dy/max;joy.mag=Math.min(m/max,1);
+    knob.style.transform=`translate(${dx}px,${dy}px)`;}
+  function joyUp(e){ if(e.pointerId!==joy.pid)return;joy.active=false;joy.pid=null;joy.dx=joy.dy=0;joy.mag=0;knob.style.transform='translate(0,0)';}
+  joyEl.addEventListener('pointerdown',e=>{e.preventDefault();joyDown(e);});
+  joyEl.addEventListener('pointermove',e=>{e.preventDefault();joyMove(e);});
+  joyEl.addEventListener('pointerup',joyUp); joyEl.addEventListener('pointercancel',joyUp);
+  function fireDown(e){e.preventDefault();firing=true;firePid=e.pointerId;fireEl.classList.add('act');try{fireEl.setPointerCapture(e.pointerId);}catch(_){}}
+  function fireUp(e){if(e.pointerId!==firePid&&firePid!==null)return;firing=false;firePid=null;fireEl.classList.remove('act');}
+  fireEl.addEventListener('pointerdown',fireDown); fireEl.addEventListener('pointerup',fireUp); fireEl.addEventListener('pointercancel',fireUp);
+
+  // ---------- shooting (weapon + ammo aware) ----------
+  function shoot(ent){
+    if(ent.reloadT>0) return;          // mid-reload, can't fire
+    if(ent.cd>0) return;
+    const w=WEAPONS[ent.wpn];
+    if(ent.ammo<=0){ startReload(ent); return; }
+    ent.cd=Math.round(w.cd*(ent.cdMul||1));
+    ent.ammo--;
+    for(let p=0;p<w.pellets;p++){
+      const sp=w.spread*(ent.isPlayer?1:1.4);
+      const a=ent.aim+rand(-sp,sp);
+      bullets.push({x:ent.x+Math.cos(a)*(ent.r+6),y:ent.y+Math.sin(a)*(ent.r+6),
+        vx:Math.cos(a)*w.spd,vy:Math.sin(a)*w.spd,owner:ent,life:w.range,dmg:w.dmg});
+    }
+    if(ent.ammo<=0) startReload(ent);  // auto-reload on empty
+  }
+  function startReload(ent){
+    const w=WEAPONS[ent.wpn];
+    let rl=w.reload;
+    if(ent===player && ent.cdMul) rl=Math.round(rl*ent.cdMul); // cargador rápido also speeds reload
+    ent.reloadT=rl;
+  }
+  function tickReload(ent){
+    if(ent.reloadT>0){
+      ent.reloadT--;
+      if(ent.reloadT<=0){ ent.ammo=WEAPONS[ent.wpn].mag; }
+    }
+  }
+
+  // Local perception: the bot only reacts to things within its vision radius,
+  // and rolls a probability to decide whether to pursue. No omniscient goals.
+  const BOT_VISION = 520;          // how far a bot "sees"
+  function botPerceive(b){
+    // already committed to a target that's still valid? keep it
+    if(b.target){
+      const t=b.target;
+      if(t.kind==='crate' && t.ref && t.ref.opened) b.target=null;
+      else if(t.kind==='hot' && !hotzone) b.target=null;
+      else if(t.kind==='supply' && !(supply || crates.some(c=>c.premium&&!c.opened))) b.target=null;
+      else if(d2(b.x,b.y,t.x,t.y) < 60*60) b.target=null; // arrived
+      else return; // still pursuing
+    }
+    // only decide occasionally (not every frame) so it feels deliberate
+    if((frame + b.hue) % 24 !== 0) return;
+
+    const v2 = BOT_VISION*BOT_VISION;
+
+    // 1) premium supply falling or premium crate on ground nearby -> very high pull
+    let sup=null;
+    if(supply) sup={x:supply.x,y:supply.y};
+    else { const pc=crates.find(c=>c.premium&&!c.opened); if(pc) sup={x:pc.x,y:pc.y}; }
+    if(sup && d2(b.x,b.y,sup.x,sup.y)<v2*1.6 && Math.random()<0.85){
+      b.target={x:sup.x,y:sup.y,kind:'supply'}; return;
+    }
+    // 2) hot zone in sight -> high chance to go farm
+    if(hotzone && d2(b.x,b.y,hotzone.x,hotzone.y)<v2*1.4 && Math.random()<0.6){
+      b.target={x:hotzone.x+rand(-70,70),y:hotzone.y+rand(-70,70),kind:'hot'}; return;
+    }
+    // 3) a crate in sight -> moderate chance
+    let bestC=null,bcd=Infinity;
+    for(const c of crates){ if(c.opened)continue;
+      const dd=d2(b.x,b.y,c.x,c.y); if(dd<v2 && dd<bcd){ bcd=dd; bestC=c; } }
+    if(bestC && Math.random()<0.4){
+      b.target={x:bestC.x,y:bestC.y,kind:'crate',ref:bestC}; return;
+    }
+    // otherwise: nothing worth pursuing -> stay roaming
+  }
+
+  // ---------- bot AI ----------
+  function botThink(b){
+    // combat / wander intent
+    let best=null,bd=Infinity;const ts=[player,...bots];
+    for(const t of ts){if(t===b||!t.alive)continue;const d=d2(b.x,b.y,t.x,t.y);if(d<bd){bd=d;best=t;}}
+    let ix=0,iy=0, engaging=false;
+    if(best&&bd<400*400){
+      engaging=true;
+      const ang=Math.atan2(best.y-b.y,best.x-b.x);b.aim=ang;const d=Math.sqrt(bd);
+      if(d>240){ix=Math.cos(ang);iy=Math.sin(ang);}else{ix=Math.cos(ang+1.4);iy=Math.sin(ang+1.4);}
+      if(Math.random()<0.5)shoot(b);
+    } else {
+      // not in combat: perceive surroundings, then either pursue or free-roam
+      botPerceive(b);
+      if(b.target){
+        const ga=Math.atan2(b.target.y-b.y,b.target.x-b.x);
+        ix=Math.cos(ga); iy=Math.sin(ga); b.aim=ga;
+      } else {
+        // free-roam: smoothly drifting heading, gently biased inward so they
+        // never park against the walls/edges
+        if(b.wanderT===undefined || --b.wanderT<=0){
+          b.wanderT=70+Math.random()*90;
+          b.roamA = (b.roamA===undefined?Math.random()*Math.PI*2:b.roamA) + rand(-0.9,0.9);
+        }
+        let hx=Math.cos(b.roamA), hy=Math.sin(b.roamA);
+        // steer away from world edges
+        const margin=240;
+        if(b.x<margin) hx+=0.8; if(b.x>WORLD.w-margin) hx-=0.8;
+        if(b.y<margin) hy+=0.8; if(b.y>WORLD.h-margin) hy-=0.8;
+        const hm=Math.hypot(hx,hy)||1; ix=hx/hm*0.7; iy=hy/hm*0.7;
+        b.aim=Math.atan2(iy,ix);
+      }
+    }
+
+    // ----- zone awareness (smooth, hysteresis, distractable) -----
+    const dz=Math.hypot(b.x-zone.cx,b.y-zone.cy)||0.0001;
+    const za=Math.atan2(zone.cy-b.y,zone.cx-b.x); // toward center
+    const inner=zone.r*0.80;   // start gently pulling in here
+    const edge=zone.r;         // the actual danger line
+
+    // occasionally a bot "gets distracted" and ignores the zone for a while
+    if(b.distractT>0) b.distractT--;
+    if(b.zoneState==='safe' && dz>inner && b.distractT<=0 && Math.random()<0.01){
+      b.distractT = 60 + Math.random()*120; // ~1-3s of ignoring the border
+    }
+
+    let zx=0,zy=0;
+    if(b.distractT>0 && dz<edge+90){
+      // distracted: no pull yet, may drift slightly out — feels human
+    } else if(dz>inner){
+      // smooth pull that ramps with how far past the inner ring we are
+      const over=(dz-inner)/Math.max(40,(edge-inner)); // 0 at inner ring, ~1 at edge
+      const strength=Math.min(2.4, 0.4 + over*2.0);
+      zx=Math.cos(za)*strength; zy=Math.sin(za)*strength;
+      // hard urgency if already outside
+      if(dz>edge){ zx=Math.cos(za)*3.2; zy=Math.sin(za)*3.2; b.distractT=0; }
+    }
+
+    // blend intents: zone pull dominates only when strong (avoids border flicker)
+    let mvx=ix+zx, mvy=iy+zy;
+    const m=Math.hypot(mvx,mvy);
+    if(m>0.0001){ mvx/=m; mvy/=m; }
+    b.mvx=mvx; b.mvy=mvy;
+    // only face the zone if we're seriously fleeing and not engaging
+    if(!engaging && dz>edge) b.aim=za;
+  }
+  function moveEnt(e,mvx,mvy,sp,setAim){
+    const m=Math.hypot(mvx,mvy);
+    if(m>0.01){ e.x+=(mvx/m)*sp; e.y+=(mvy/m)*sp; if(setAim!==false) e.aim=Math.atan2(mvy,mvx); }
+    e.x=Math.max(e.r,Math.min(WORLD.w-e.r,e.x)); e.y=Math.max(e.r,Math.min(WORLD.h-e.r,e.y));
+  }
+
+  function aliveTotal(){return (player.alive?1:0)+bots.filter(b=>b.alive).length;}
+  function aliveBots(){return bots.filter(b=>b.alive);}
+  function enterSpectator(){
+    if(specEl.classList.contains('show'))return;
+    deadRank=aliveTotal()+1;
+    joyEl.classList.remove('show'); fireEl.classList.remove('show'); specEl.classList.add('show'); $('specActions').classList.add('show'); $('useBtn').classList.remove('show'); $('ammoBox').classList.remove('show'); $('swapBtn').classList.remove('show');
+    firing=false;joy.active=false;joy.dx=joy.dy=0;joy.mag=0;knob.style.transform='translate(0,0)';specIndex=0;
+  }
+  function specTarget(){const a=aliveBots();if(!a.length)return null;specIndex=((specIndex%a.length)+a.length)%a.length;return a[specIndex];}
+  function cycleSpec(d){const a=aliveBots();if(!a.length)return;specIndex=(((specIndex+d)%a.length)+a.length)%a.length;}
+  $('specArrowL').addEventListener('pointerdown',e=>{e.preventDefault();cycleSpec(-1);});
+  $('specArrowR').addEventListener('pointerdown',e=>{e.preventDefault();cycleSpec(1);});
+
+  function applyDamage(t,dmg){
+    if(t.shield>0){
+      const absorbed=Math.min(t.shield,dmg);
+      t.shield-=absorbed; dmg-=absorbed;
+    }
+    t.hp-=dmg;
+  }
+
+  // ---------- loot crates ----------
+  function rollCrateReward(premium){
+    const r=Math.random();
+    if(r < (premium?0.7:0.45)){
+      const id = premium
+        ? (Math.random()<0.5?'sniper':(Math.random()<0.6?'shotgun':'smg'))
+        : ['smg','shotgun','sniper'][Math.floor(rand(0,3))];
+      return {type:'weapon', id};
+    }
+    const consumIds=Object.keys(ITEMS).filter(k=>ITEMS[k].type==='consumable');
+    return {type:'item', id:consumIds[Math.floor(rand(0,consumIds.length))], n:premium?2:1};
+  }
+
+  function giveLoot(c){
+    const rw=c.reward||rollCrateReward(c.premium);
+    if(rw.type==='weapon'){
+      pickUpWeapon(rw.id, c.premium);
+    } else {
+      for(let i=0;i<(rw.n||1);i++){ if(!grabItem(rw.id)) break; }
+    }
+    if(c.premium){ player.shield=Math.min(120,player.shield+30); }
+  }
+
+  // weapon inventory: up to 2; new weapon goes to empty slot, else replaces active
+  function pickUpWeapon(id, premium){
+    if(weaponsHeld.includes(id)){
+      // already have it: just top up ammo if it's the active one
+      if(player.wpn===id){ player.ammo=WEAPONS[id].mag; toast('Munición recargada'); }
+      else toast('Ya tienes '+WEAPONS[id].name);
+      return;
+    }
+    if(weaponsHeld.length<MAX_WEAPONS){
+      weaponsHeld.push(id);
+      // auto-equip the newly found weapon
+      setActiveWeapon(weaponsHeld.length-1);
+      toast('🔫 '+WEAPONS[id].name+(premium?' (premium)':''));
+    } else {
+      // full: replace the currently active weapon
+      const idx=weaponsHeld.indexOf(player.wpn);
+      weaponsHeld[idx<0?0:idx]=id;
+      setActiveWeapon(idx<0?0:idx);
+      toast('🔫 Cambiada por '+WEAPONS[id].name);
+    }
+    updateSwapBtn();
+  }
+  function setActiveWeapon(slot){
+    const id=weaponsHeld[slot]; if(!id) return;
+    player.wpn=id; player.ammo=WEAPONS[id].mag; player.reloadT=0;
+    $('wpnTag').textContent=WEAPONS[id].name;
+    updateSwapBtn();
+  }
+  function swapWeapon(){
+    if(weaponsHeld.length<2) return;
+    const cur=weaponsHeld.indexOf(player.wpn);
+    const next=(cur+1)%weaponsHeld.length;
+    setActiveWeapon(next);
+    toast('Arma: '+WEAPONS[weaponsHeld[next]].name);
+  }
+  function updateSwapBtn(){
+    const b=$('swapBtn');
+    if(!b) return;
+    if(weaponsHeld.length>=2){
+      b.classList.add('show');
+      const other=weaponsHeld.find(w=>w!==player.wpn);
+      b.innerHTML=`<span style="font-size:10px;opacity:.7">CAMBIAR</span><span style="font-size:12px;font-weight:800">${WEAPONS[other].name}</span>`;
+    } else b.classList.remove('show');
+  }
+  if($('swapBtn')) $('swapBtn').addEventListener('pointerdown',e=>{e.preventDefault();swapWeapon();});
+
+  function botLoot(b,premium){
+    if(Math.random() < (premium?0.8:0.5)){
+      const id = premium
+        ? (Math.random()<0.5?'sniper':'shotgun')
+        : ['smg','shotgun','sniper'][Math.floor(rand(0,3))];
+      b.wpn=id; b.ammo=WEAPONS[id].mag; b.reloadT=0;
+    }
+    if(premium) b.shield=Math.min(120,(b.shield||0)+30);
+  }
+
+  let maxItemWarnT=0;
+  function updateCrates(){
+    if(maxItemWarnT>0) maxItemWarnT--;
+    for(const c of crates){
+      if(c.opened)continue;
+      const near=d2(player.x,player.y,c.x,c.y)<(player.r+22)*(player.r+22);
+      if(near){
+        // if this crate gives an item and bag is full, refuse to open + warn
+        const rw=c.reward||{};
+        if(rw.type==='item' && bag.length>=MAX_ITEMS){
+          if(maxItemWarnT<=0){ toast('⚠️ Máximo de items alcanzado'); maxItemWarnT=120; }
+          c.opening=0;
+          continue;
+        }
+        c.opening++;
+        if(c.opening>=60){ c.opened=true; giveLoot(c); }
+      } else if(c.opening>0){ c.opening=Math.max(0,c.opening-2); }
+    }
+  }
+
+  // ---------- hot zone ----------
+  function updateHotzone(){
+    if(!hotzone)return;
+    hotzone.life--;
+    if(hotzone.life<=0){
+      // rotate to a new spot inside the playable area
+      hotzone={x:rand(WORLD.w*0.15,WORLD.w*0.85),y:rand(WORLD.h*0.15,WORLD.h*0.85),r:300,life:900};
+      toast('🟡 Nueva zona caliente');
+      return;
+    }
+    // accrue coins while standing inside
+    if(d2(player.x,player.y,hotzone.x,hotzone.y) < hotzone.r*hotzone.r){
+      coinFx++;
+      if(coinFx%30===0){ matchCoins+=5; toast('+5 monedas (zona)'); }
+    }
+  }
+
+  // ---------- supply drop (premium crate from the sky) ----------
+  function updateSupply(){
+    if(!supply){
+      supplyTimer--;
+      if(supplyTimer<=0){
+        // drop near the current zone so it stays relevant
+        const ang=Math.random()*Math.PI*2, rr=zone.r*0.5*Math.random();
+        supply={x:zone.cx+Math.cos(ang)*rr, y:zone.cy+Math.sin(ang)*rr, fall:90, crate:null};
+        toast('📦 Suministro cayendo…');
+      }
+    } else if(supply.fall>0){
+      supply.fall--;
+      if(supply.fall<=0){
+        // landed: becomes a premium crate
+        crates.push({x:supply.x,y:supply.y,opening:0,opened:false,premium:true,reward:rollCrateReward(true)});
+        supply.crate=crates[crates.length-1];
+        supply=null;
+        supplyTimer=600+Math.random()*300; // next drop later
+      }
+    }
+  }
+
+  function update(){
+    frame++;
+    if(zone.delay>0) zone.delay--;
+    else if(zone.r>zone.minR) zone.r-=zone.shrink;
+    if(player.alive){
+      if(player.boostT>0){ player.boostT--; if(player.boostT<=0) player.boostMul=1; }
+      const base=3.4*(player.spdMul||1)*(player.boostMul||1);
+      const sp=base*(joy.mag>0?Math.max(joy.mag,0.35):0);
+      moveEnt(player,joy.dx,joy.dy,sp);
+      if(player.cd>0)player.cd--;
+      tickReload(player);
+      if(firing)shoot(player);
+      updateCrates();
+      updateHotzone();
+      if(Math.hypot(player.x-zone.cx,player.y-zone.cy)>zone.r) applyDamage(player,zone.dmg);
+      if(player.hp<=0){player.hp=0;player.alive=false;enterSpectator();}
+    }
+    updateSupply();
+    for(const b of bots){
+      if(!b.alive)continue;
+      botThink(b);moveEnt(b,b.mvx,b.mvy,2.5,false);
+      if(b.cd>0)b.cd--;
+      tickReload(b);
+      // bots open crates they're standing on
+      for(const c of crates){
+        if(c.opened)continue;
+        if(d2(b.x,b.y,c.x,c.y)<(b.r+20)*(b.r+20)){
+          c.botOpen=(c.botOpen||0)+1;
+          if(c.botOpen>=70){ c.opened=true; botLoot(b,c.premium); }
+        }
+      }
+      if(Math.hypot(b.x-zone.cx,b.y-zone.cy)>zone.r)b.hp-=zone.dmg;
+      if(b.hp<=0){b.hp=0;b.alive=false;}
+    }
+    for(const bl of bullets){
+      bl.x+=bl.vx;bl.y+=bl.vy;if(--bl.life<=0){bl.dead=true;continue;}
+      const ts=[player,...bots];
+      for(const t of ts){
+        if(!t.alive||t===bl.owner)continue;
+        if(d2(bl.x,bl.y,t.x,t.y)<(t.r+BULLET_R)*(t.r+BULLET_R)){
+          if(t===player) applyDamage(t,bl.dmg); else t.hp-=bl.dmg;
+          bl.dead=true;
+          if(t.hp<=0&&t.alive){t.hp=0;t.alive=false;if(bl.owner===player)kills++;if(t===player)enterSpectator();}
+          break;
+        }
+      }
+    }
+    bullets=bullets.filter(b=>!b.dead);
+    let focus=player.alive?player:specTarget();
+    if(focus){cam.x+=(focus.x-VIEW.w/2-cam.x)*0.12;cam.y+=(focus.y-VIEW.h/2-cam.y)*0.12;clampCam();}
+    if(!player.alive){const a=aliveBots();specLabel.textContent=a.length?`Observando ${specIndex+1}/${a.length}`:'Observando';}
+    updateHUD();
+    const at=aliveTotal();
+    if(player.alive&&at===1){state='end';showEnd(true);}
+    else if(!player.alive&&at<=1){state='end';showEnd(false);}
+  }
+
+  // picking up a world consumable adds a charge to your carry slot
+  function grabItem(id){
+    const it=ITEMS[id]; if(!it) return false;
+    if(bag.length>=MAX_ITEMS){ toast('⚠️ Máximo de items'); return false; }
+    bag.push(id);
+    toast('+1 '+it.name);
+    updateUseBtn();
+    return true;
+  }
+
+  function useConsumable(){
+    if(!player||!player.alive||bag.length===0) return;
+    const id=bag[0]; const it=ITEMS[id]; if(!it){ bag.shift(); return; }
+    if(it.heal){ player.hp=Math.min(player.maxhp,player.hp+it.heal); }
+    if(it.shield){ player.shield=Math.min(120,player.shield+it.shield); }
+    if(it.boost){ player.boostMul=it.boost; player.boostT=it.boostT; }
+    bag.shift();
+    toast(it.name+' usado');
+    updateUseBtn();
+  }
+  function updateUseBtn(){
+    const b=$('useBtn');
+    if(bag.length>0){
+      b.classList.add('show');
+      const id=bag[0];
+      // show next item icon + how many total in bag
+      b.innerHTML=`<span style="font-size:22px">${ITEMS[id].icon}</span><span style="font-size:11px">${bag.length}/${MAX_ITEMS}</span>`;
+    } else { b.classList.remove('show'); }
+  }
+  if($('useBtn')) $('useBtn').addEventListener('pointerdown',e=>{e.preventDefault();useConsumable();});
+
+  function updateHUD(){
+    $('alive').innerHTML=`Vivos: <b>${aliveTotal()}</b>/10`;
+    $('kills').textContent=`Bajas: ${kills}`;
+    const mc=$('matchCoins');
+    if(matchCoins>0){ mc.style.display=''; mc.textContent='● '+matchCoins; } else mc.style.display='none';
+    $('hpfill').style.width=Math.max(0,(player.hp/player.maxhp)*100)+'%';
+    const sh=$('shieldTag');
+    if(player.shield>0){ sh.style.display=''; sh.textContent='🛡 '+Math.round(player.shield); } else { sh.style.display='none'; }
+    // ammo + reload
+    const w=WEAPONS[player.wpn];
+    const at=$('ammoText'), rb=$('reloadBar'), rf=$('reloadFill');
+    if(player.reloadT>0){
+      at.textContent='Recargando…'; at.classList.add('empty');
+      rb.classList.add('show');
+      rf.style.width=(100*(1-player.reloadT/Math.max(1,reloadTotal(player)))) + '%';
+    } else {
+      at.textContent=`${player.ammo} / ${w.mag}`;
+      at.classList.toggle('empty', player.ammo===0);
+      rb.classList.remove('show');
+    }
+    const out=Math.hypot(player.x-zone.cx,player.y-zone.cy)>zone.r;
+    const zi=$('zoneInfo');
+    if(zone.delay>0){ zi.textContent='Zona estable'; zi.style.color=''; }
+    else { zi.textContent=out?'⚠️ FUERA DE ZONA':'Zona cerrando…'; zi.style.color=out?'#ff7b7b':''; }
+  }
+  function reloadTotal(ent){ let rl=WEAPONS[ent.wpn].reload; if(ent===player&&ent.cdMul) rl=Math.round(rl*ent.cdMul); return rl; }
+
+  function drawShape(x,y,r,color,shape,stroke){
+    ctx.fillStyle=color;
+    if(shape==='square'){ ctx.fillRect(x-r,y-r,r*2,r*2); if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.strokeRect(x-r,y-r,r*2,r*2);} }
+    else if(shape==='triangle'){ ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y+r);ctx.lineTo(x-r,y+r);ctx.closePath();ctx.fill();if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke();} }
+    else { ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke();} }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,VIEW.w,VIEW.h);
+    ctx.fillStyle='#0e131c';ctx.fillRect(0,0,VIEW.w,VIEW.h);
+    ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;
+    const g=80,sx=-(cam.x%g),sy=-(cam.y%g);ctx.beginPath();
+    for(let x=sx;x<VIEW.w;x+=g){ctx.moveTo(x,0);ctx.lineTo(x,VIEW.h);}
+    for(let y=sy;y<VIEW.h;y+=g){ctx.moveTo(0,y);ctx.lineTo(VIEW.w,y);}ctx.stroke();
+    ctx.strokeStyle='rgba(126,231,135,.28)';ctx.lineWidth=3;ctx.strokeRect(-cam.x,-cam.y,WORLD.w,WORLD.h);
+    const zx=zone.cx-cam.x,zy=zone.cy-cam.y;
+    ctx.save();ctx.beginPath();ctx.rect(0,0,VIEW.w,VIEW.h);ctx.arc(zx,zy,Math.max(zone.r,1),0,Math.PI*2,true);
+    ctx.fillStyle='rgba(150,30,60,.32)';ctx.fill('evenodd');ctx.restore();
+    ctx.beginPath();ctx.arc(zx,zy,Math.max(zone.r,1),0,Math.PI*2);ctx.strokeStyle='#ff6b8a';ctx.lineWidth=2.5;ctx.stroke();
+    // hot zone (gold area on the ground)
+    if(hotzone){
+      const hx=hotzone.x-cam.x,hy=hotzone.y-cam.y;
+      if(hx>-hotzone.r&&hy>-hotzone.r&&hx<VIEW.w+hotzone.r&&hy<VIEW.h+hotzone.r){
+        const pulse=0.12+0.05*Math.sin(frame*0.08);
+        ctx.beginPath();ctx.arc(hx,hy,hotzone.r,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,216,102,${pulse})`;ctx.fill();
+        ctx.beginPath();ctx.arc(hx,hy,hotzone.r,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,216,102,.7)';ctx.lineWidth=2.5;ctx.setLineDash([10,8]);ctx.stroke();ctx.setLineDash([]);
+        ctx.fillStyle='rgba(255,216,102,.9)';ctx.font='bold 12px system-ui';ctx.textAlign='center';
+        ctx.fillText('ZONA CALIENTE',hx,hy-hotzone.r-8);ctx.textAlign='left';
+      }
+    }
+    // loot crates
+    for(const c of crates){
+      if(c.opened)continue;const cx=c.x-cam.x,cy=c.y-cam.y;
+      if(cx<-30||cy<-30||cx>VIEW.w+30||cy>VIEW.h+30)continue;
+      const s=c.premium?15:12;
+      ctx.fillStyle=c.premium?'#ffd866':'#b88a4a';
+      roundRect(cx-s,cy-s,s*2,s*2,4);ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=2;roundRect(cx-s,cy-s,s*2,s*2,4);ctx.stroke();
+      ctx.fillStyle='rgba(0,0,0,.5)';ctx.font=`${c.premium?15:12}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(c.premium?'★':'?',cx,cy+1);ctx.textAlign='left';ctx.textBaseline='alphabetic';
+      // opening progress ring
+      if(c.opening>0){
+        ctx.beginPath();ctx.arc(cx,cy,s+8,-Math.PI/2,-Math.PI/2+(c.opening/60)*Math.PI*2);
+        ctx.strokeStyle='#7ee787';ctx.lineWidth=3;ctx.stroke();
+      }
+    }
+    // falling supply drop
+    if(supply&&supply.fall>0){
+      const sxp=supply.x-cam.x, syp=supply.y-cam.y;
+      const drop=supply.fall*2.2; // visual offset above landing
+      ctx.globalAlpha=.9;
+      ctx.fillStyle='#ffd866';roundRect(sxp-13,syp-drop-13,26,26,5);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.fillStyle='rgba(0,0,0,.5)';ctx.font='15px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('📦',sxp,syp-drop);ctx.textAlign='left';ctx.textBaseline='alphabetic';
+      // landing marker
+      ctx.beginPath();ctx.arc(sxp,syp,16,0,Math.PI*2);ctx.strokeStyle='rgba(255,216,102,.6)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+    for(const bl of bullets){const bx=bl.x-cam.x,by=bl.y-cam.y;ctx.beginPath();ctx.arc(bx,by,BULLET_R,0,Math.PI*2);
+      ctx.fillStyle=bl.owner===player?'#fff3b0':'#ff9d9d';ctx.fill();}
+    for(const e of [...bots,player]){
+      if(!e.alive)continue;const ex=e.x-cam.x,ey=e.y-cam.y;
+      if(ex<-30||ey<-30||ex>VIEW.w+30||ey>VIEW.h+30)continue;
+      // shield ring (player)
+      if(e.shield>0){ctx.beginPath();ctx.arc(ex,ey,e.r+5,0,Math.PI*2);ctx.strokeStyle='#5bd6ff';ctx.lineWidth=2.5;ctx.globalAlpha=.85;ctx.stroke();ctx.globalAlpha=1;}
+      // boost glow
+      if(e.boostT>0){ctx.beginPath();ctx.arc(ex,ey,e.r+9,0,Math.PI*2);ctx.strokeStyle='rgba(255,157,91,.5)';ctx.lineWidth=2;ctx.stroke();}
+      const col=e.isPlayer?SKINS[e.skin].color:`hsl(${e.hue},65%,58%)`;
+      const shape=e.isPlayer?SKINS[e.skin].shape:'circle';
+      drawShape(ex,ey,e.r,col,shape,'rgba(0,0,0,.35)');
+      ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex+Math.cos(e.aim)*(e.r+11),ey+Math.sin(e.aim)*(e.r+11));
+      ctx.strokeStyle=e.isPlayer?'#dfffe6':'rgba(255,255,255,.85)';ctx.lineWidth=4;ctx.stroke();
+      if(!e.isPlayer){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(ex-14,ey-e.r-10,28,4);
+        ctx.fillStyle='#7ee787';ctx.fillRect(ex-14,ey-e.r-10,28*(e.hp/100),4);}
+    }
+    if(!player.alive&&state==='play'){const t=specTarget();if(t&&t.alive){const ex=t.x-cam.x,ey=t.y-cam.y;
+      ctx.beginPath();ctx.arc(ex,ey,t.r+7,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);}}
+    drawMinimap();
+  }
+
+  function drawMinimap(){
+    const pad=10,mmW=58,mmH=mmW*(WORLD.h/WORLD.w),mx=VIEW.w-mmW-pad,my=pad+46,sx=mmW/WORLD.w,sy=mmH/WORLD.h;
+    ctx.save();ctx.globalAlpha=0.9;ctx.fillStyle='rgba(8,12,18,.7)';ctx.strokeStyle='rgba(126,231,135,.35)';ctx.lineWidth=1.5;
+    roundRect(mx-3,my-3,mmW+6,mmH+6,6);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(20,26,36,.9)';ctx.fillRect(mx,my,mmW,mmH);
+    // clip to minimap rect (overflow hidden)
+    ctx.save();
+    ctx.beginPath();ctx.rect(mx,my,mmW,mmH);ctx.clip();
+    const zx=mx+zone.cx*sx,zy=my+zone.cy*sy,zr=Math.max(zone.r*sx,1);
+    ctx.save();ctx.beginPath();ctx.rect(mx,my,mmW,mmH);ctx.arc(zx,zy,zr,0,Math.PI*2,true);
+    ctx.fillStyle='rgba(150,30,60,.4)';ctx.fill('evenodd');ctx.restore();
+    ctx.beginPath();ctx.arc(zx,zy,zr,0,Math.PI*2);ctx.strokeStyle='#ff6b8a';ctx.lineWidth=1.2;ctx.stroke();
+    // supply drop = yellow dot (pulsing), as requested
+    const sup = supply ? {x:supply.x,y:supply.y} : crates.find(c=>c.premium&&!c.opened);
+    if(sup){
+      const blink=0.5+0.5*Math.sin(frame*0.18);
+      ctx.beginPath();ctx.arc(mx+sup.x*sx,my+sup.y*sy,2.6,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,216,102,${0.5+0.5*blink})`;ctx.fill();
+      ctx.beginPath();ctx.arc(mx+sup.x*sx,my+sup.y*sy,4.5*blink+2,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,216,102,.6)';ctx.lineWidth=1;ctx.stroke();
+    }
+    // hot zone = soft transparent gold fill (no border)
+    if(hotzone){
+      ctx.beginPath();ctx.arc(mx+hotzone.x*sx,my+hotzone.y*sy,Math.max(hotzone.r*sx,2),0,Math.PI*2);
+      ctx.fillStyle='rgba(255,216,102,.18)';ctx.fill();
+    }
+    // only OUR position (or spectated target's), no enemies
+    const me = player.alive ? player : specTarget();
+    if(me){ ctx.beginPath();ctx.arc(mx+me.x*sx,my+me.y*sy,2.8,0,Math.PI*2);
+      ctx.fillStyle='#7ee787';ctx.fill();ctx.strokeStyle='#0a0e14';ctx.lineWidth=1;ctx.stroke(); }
+    ctx.restore(); // end clip
+    ctx.restore();
+  }
+  function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+  function showEnd(won){
+    hud.classList.remove('show'); joyEl.classList.remove('show'); fireEl.classList.remove('show'); specEl.classList.remove('show'); $('specActions').classList.remove('show'); $('useBtn').classList.remove('show'); $('ammoBox').classList.remove('show'); $('swapBtn').classList.remove('show');
+    const rank=won?1:deadRank;
+    const base=Math.round((11-rank)*15 + kills*25);
+    const reward=base+matchCoins;
+    profile.coins+=reward; profile.xp+=reward;
+    if(profile.xp>=profile.level*200){ profile.level++; }
+    $('placeMsg').textContent='#'+rank;
+    $('endTitle').textContent=won?'¡VICTORIA!':'Eliminado';
+    $('endSub').textContent=won?`Último en pie. Bajas: ${kills}.`:`Puesto ${rank} de 10. Bajas: ${kills}.`;
+    $('reward').textContent=matchCoins>0?`+${reward} monedas (${base} + ${matchCoins} zona)`:`+${reward} monedas`;
+    $('endOv').classList.add('show');
+  }
+  $('endAgain').addEventListener('click',()=>{ $('endOv').classList.remove('show'); openDrop(); });
+  $('endHome').addEventListener('click',()=>{ $('endOv').classList.remove('show'); state='menu'; show('homeScreen'); });
+  function leaveMatch(){
+    state='menu';
+    specEl.classList.remove('show'); $('specActions').classList.remove('show');
+    hud.classList.remove('show'); joyEl.classList.remove('show'); fireEl.classList.remove('show');
+    $('useBtn').classList.remove('show'); $('ammoBox').classList.remove('show'); $('swapBtn').classList.remove('show');
+  }
+  $('specAgain').addEventListener('click',()=>{ leaveMatch(); openDrop(); });
+  $('specMenu').addEventListener('click',()=>{ leaveMatch(); show('homeScreen'); });
+
+  function loop(){ if(state==='play')update(); if(state!=='menu')draw(); requestAnimationFrame(loop); }
+
+  // boot
+  resize(); refreshCoins(); state='menu'; requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
